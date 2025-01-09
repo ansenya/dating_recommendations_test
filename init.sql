@@ -1,4 +1,4 @@
-CREATE TABLE users
+CREATE TABLE if not exists users
 (
     id                   SERIAL PRIMARY KEY,      -- Уникальный идентификатор пользователя
     first_name           VARCHAR(100) NOT NULL,   -- Имя пользователя
@@ -16,16 +16,9 @@ CREATE TABLE users
     updated_at           TIMESTAMP DEFAULT NOW()  -- Дата и время последнего обновления данных
 );
 
-
-CREATE TABLE likes
-(
-    id            SERIAL PRIMARY KEY,                                                            -- Уникальный идентификатор лайка
-    user_id       INT NOT NULL,                                                                  -- Идентификатор пользователя, который поставил лайк
-    liked_user_id INT NOT NULL,                                                                  -- Идентификатор пользователя, которому поставлен лайк
-    created_at    TIMESTAMP DEFAULT NOW(),                                                       -- Время, когда был поставлен лайк
-    CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,            -- Внешний ключ на пользователя, который поставил лайк
-    CONSTRAINT fk_liked_user FOREIGN KEY (liked_user_id) REFERENCES users (id) ON DELETE CASCADE -- Внешний ключ на пользователя, которому поставлен лайк
-);
+DELETE
+FROM users
+where id > 0;
 
 INSERT INTO users (first_name, last_name, date_of_birth, gender, location, bio, preferred_gender, preferred_age_bottom,
                    preferred_age_top, max_distance, last_active, created_at, updated_at)
