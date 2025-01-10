@@ -1,4 +1,4 @@
-CREATE TABLE if not exists users
+CREATE TABLE IF NOT EXISTS users
 (
     id                   SERIAL PRIMARY KEY,      -- Уникальный идентификатор пользователя
     first_name           VARCHAR(100) NOT NULL,   -- Имя пользователя
@@ -14,6 +14,15 @@ CREATE TABLE if not exists users
     last_active          TIMESTAMP DEFAULT NOW(), -- Время последней активности
     created_at           TIMESTAMP DEFAULT NOW(), -- Дата и время создания пользователя
     updated_at           TIMESTAMP DEFAULT NOW()  -- Дата и время последнего обновления данных
+);
+
+CREATE TABLE IF NOT EXISTS cities
+(
+    id       SERIAL PRIMARY KEY,
+    city     VARCHAR(100),
+    lat      FLOAT,
+    lon      FLOAT,
+    timezone VARCHAR(10)
 );
 
 DELETE
