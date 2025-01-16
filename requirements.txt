@@ -1,3 +1,4 @@
+torch
 sentence-transformers
 sqlalchemy
 pandas
@@ -5,5 +6,4 @@ psycopg2-binary
 seaborn
 matplotlib
 ipywidgets
-torch
 geopy
