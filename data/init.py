@@ -1,116 +1,55 @@
-from sqlalchemy import create_engine, Column, Integer, String, Date, Text, TIMESTAMP, text, Float, ForeignKey
-from sqlalchemy.orm import declarative_base, relationship
-from sqlalchemy.orm import sessionmaker
+from pymongo import MongoClient
+from sentence_transformers import SentenceTransformer
 from datetime import datetime
-
-from random import randint
-
 import json
+import torch
 
-DATABASE_URL = "postgresql://user:insecure@localhost:5432/dating"
+# Подключение к MongoDB
+DATABASE_URL = "mongodb://senya:insecure@127.0.0.1:27017/dating"
+client = MongoClient(DATABASE_URL)
+db = client.dating
 
-Base = declarative_base()
+# Инициализация модели
+if torch.cuda.is_available():
+    model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2', device='cuda')
+else:
+    model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2', device='cpu')
 
+# Удаление старых данных
+db.cities.drop()
+db.users.drop()
 
-class User(Base):
-    __tablename__ = 'users'
+# Загрузка данных городов из JSON
+with open('cities.json', 'r') as f:
+    city_data = json.load(f)
 
-    id = Column(Integer, primary_key=True)  # Уникальный идентификатор
-    first_name = Column(String(100), nullable=False)  # Имя пользователя
-    last_name = Column(String(100))  # Фамилия
-    date_of_birth = Column(Date)  # Дата рождения
-    gender = Column(String(10))  # Пол
-    city_id = Column(Integer, ForeignKey('cities.id'))  # Локация
-    bio = Column(Text)  # Описание
-    preferred_gender = Column(String(10))  # Предпочитаемый пол
-    preferred_age_bottom = Column(Integer)  # Нижний диапазон возраста
-    preferred_age_top = Column(Integer)  # Верхний диапазон возраста
-    max_distance = Column(Integer)  # Максимальное расстояние
-    last_active = Column(TIMESTAMP, default=datetime.now)  # Время последней активности
-    created_at = Column(TIMESTAMP, default=datetime.now)  # Дата создания
-    updated_at = Column(TIMESTAMP, default=datetime.now)  # Дата последнего обновления
-    city = relationship('City', back_populates='users')
+# Добавление городов в базу данных
+city_ids = {}
+for city in city_data:
+    result = db.cities.insert_one(city)
+    city_ids[city["address"]] = result.inserted_id
 
+# Загрузка данных пользователей из JSON
+with open('users.json', 'r') as f:
+    user_data = json.load(f)
 
-class City(Base):
-    __tablename__ = 'cities'
+# Обработка и добавление пользователей в базу данных
+users = []
+for user in user_data:
+    city_name = f"г {user.pop('city')}"
+    city_id = city_ids.get(city_name)
 
-    id = Column(Integer, primary_key=True)
-    address = Column(String(100), nullable=False)
-    lat = Column(Float)
-    lon = Column(Float)
-    timezone = Column(String(100), nullable=False)
-    users = relationship('User', back_populates='city')
+    if city_id:
+        user["city_id"] = city_id
 
+    # Кодирование биографии
+    user["embedded_bio"] = model.encode(user["bio"]).tolist()
 
-sql_create_table_users = '''CREATE TABLE IF NOT EXISTS users
-(
-    id                   SERIAL PRIMARY KEY,      -- Уникальный идентификатор пользователя
-    first_name           VARCHAR(100) NOT NULL,   -- Имя пользователя
-    last_name            VARCHAR(100),            -- Фамилия пользователя
-    date_of_birth        DATE,                    -- Дата рождения
-    gender               VARCHAR(10),             -- Пол пользователя
-    city_id              INT REFERENCES cities(id), -- Локация (город)
-    bio                  TEXT,                    -- Описание о себе
-    preferred_gender     VARCHAR(10),             -- Предпочитаемый пол партнера
-    preferred_age_bottom INT,                     -- Диапазон возраста партнера
-    preferred_age_top    INT,                     -- Диапазон возраста партнера
-    max_distance         INT,                     -- Максимальное расстояние для поиска
-    last_active          TIMESTAMP DEFAULT NOW(), -- Время последней активности
-    created_at           TIMESTAMP DEFAULT NOW(), -- Дата и время создания пользователя
-    updated_at           TIMESTAMP DEFAULT NOW()  -- Дата и время последнего обновления данных
-);'''
+    # Добавление временных полей
+    user["created_at"] = datetime.now()
+    user["updated_at"] = datetime.now()
+    user["last_active"] = datetime.now()
 
-sql_create_table_cities = '''CREATE TABLE IF NOT EXISTS cities
-(
-    id       SERIAL PRIMARY KEY,
-    address  VARCHAR(100),
-    lat      FLOAT,
-    lon      FLOAT,
-    timezone VARCHAR(10)
-);'''
+    users.append(user)
 
-sql_delete_users = '''DELETE
-FROM users
-where id > 0;
-'''
-
-sql_delete_cities = '''DELETE
-FROM cities
-where id > 0;
-'''
-
-if __name__ == "__main__":
-    engine = create_engine(DATABASE_URL)
-    Session = sessionmaker(bind=engine)
-    session = Session()
-
-    queries = [sql_create_table_cities, sql_create_table_users, sql_delete_users, sql_delete_cities]
-    for query in queries:
-        if query.strip():
-            session.execute(text(query))
-
-    cities = [City(**city) for city in json.loads(open('cities.json').read())]
-    session.add_all(cities)
-
-    city_map = {city.address: city.id for city in session.query(City).all()}
-
-    users = []
-    for user_data in json.loads(open('users.json').read()):
-        city = user_data.pop('city')
-        location_id = city_map.get(f"г {city}")
-        if location_id:
-            user_data['city_id'] = location_id
-            users.append(User(**user_data))
-    session.add_all(users)
-    session.commit()
-
-    users = [user.__dict__ for user in session.query(User).all()]
-    for el in users:
-        el.pop('_sa_instance_state', None)
-        el["age"] = datetime.now().year - el["date_of_birth"].year
-
-    random_id = randint(0, len(users) - 1)
-
-    user = users[random_id]
-    users.remove(user)
+db.users.insert_many(users)
