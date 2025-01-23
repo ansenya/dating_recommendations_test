@@ -5,7 +5,7 @@ import json
 import torch
 
 # Подключение к MongoDB
-DATABASE_URL = "mongodb://senya:insecure@127.0.0.1:27017/dating"
+DATABASE_URL = "mongodb://root:insecure@127.0.0.1:27017"
 client = MongoClient(DATABASE_URL)
 db = client.dating
 
