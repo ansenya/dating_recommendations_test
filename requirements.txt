@@ -1,8 +1,7 @@
 torch
 sentence-transformers
-sqlalchemy
 pandas
-psycopg2-binary
+pymongo
 seaborn
 matplotlib
 ipywidgets
